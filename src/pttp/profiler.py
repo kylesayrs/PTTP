@@ -1,86 +1,118 @@
-from typing import List, Set
-from functools import partial
-import matplotlib.pyplot as plt
-from torch.utils._python_dispatch import TorchDispatchMode
+from typing import List, Set, Dict, Optional
 
 import gc
-import torch
 import weakref
+import warnings
+from functools import partial
+from collections import defaultdict
+from dataclasses import dataclass, field
+
+import torch
+from torch.utils._python_dispatch import TorchDispatchMode
+import matplotlib.pyplot as plt
 
 from .helpers import get_alloc_size
 
 __all__ = ["TensorProfiler"]
 
+aten = torch._ops.ops.aten
+
+
+@dataclass
+class MemoryProfile:
+    current: int = 0
+    timeline: List[int] = field(default_factory=list)
+
 
 class TensorProfiler(TorchDispatchMode):
-    total_tensor_memory: int
-    memory_timeline: List[int]
-    
+
+    _memory = Dict[torch.device, MemoryProfile]
     _tracked_tensors: Set[int]
 
     def __init__(self):
-        self.total_tensor_memory = 0
-        self.memory_timeline = []
-
-        self._tracked_tensors = set()
+        self._memory: Dict[torch.device, MemoryProfile] = defaultdict(MemoryProfile)
+        self._tracked: Set[int] = set()
 
     def __torch_dispatch__(self, func, types, args, kwargs=None):
         ret = func(*args, **(kwargs or {}))
         if isinstance(ret, torch.Tensor):
+            tensor_hash = hash(ret)
+
+            # TODO: do not warn on these functions
+            # aten.set_.source_Storage
+            # aten.copy_.default
+            # aten.add_.Tensor
+            if tensor_hash in self._tracked:
+                warnings.warn(f"Attmepted to track tensor twice from dispatch {func}")
+            
             self.track_tensor(ret)
 
         return ret
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        super().__exit__(exc_type, exc_val, exc_tb)
         gc.collect()
+        return super().__exit__(exc_type, exc_val, exc_tb)
 
     def track_tensor(self, tensor: torch.Tensor) -> torch.Tensor:
-        tensor_hash = hash(tensor)
-        tensor_memory = get_alloc_size(tensor)
+        _hash = hash(tensor)
+        size = get_alloc_size(tensor)
+        device = tensor.device
 
-        # warn when init is called twice
-        if tensor_hash in self._tracked_tensors:
-            print("double init")
+        # skip if already tracked
+        if _hash in self._tracked:
             return
 
-        # add memory
-        self.total_tensor_memory += tensor_memory
-        self._add_to_timeline()
-        self._tracked_tensors.add(tensor_hash)
+        # add tensor
+        self._memory[device].current += size
+        self._snapshot_timeline()
+        self._tracked.add(_hash)
 
         # register hook to subtract memory
-        weakref.finalize(tensor, partial(self._on_tensor_deallocated, tensor_memory, tensor_hash))
+        finalizer = partial(self._on_tensor_deallocated, _hash, size, device)
+        weakref.finalize(tensor, finalizer)
 
-    def _on_tensor_deallocated(self, tensor_memory, tensor_hash):
-        self.total_tensor_memory -= tensor_memory
-        self._add_to_timeline()
-        self._tracked_tensors.remove(tensor_hash)
+    def _on_tensor_deallocated(self, hash: int, size: int, device: torch.device):
+        # subtract tensor
+        self._memory[device].current -= size
+        self._snapshot_timeline()
+        self._tracked.remove(hash)
+
+    def _snapshot_timeline(self):
+        for mem in self._memory.values():
+            mem.timeline.append(mem.current)
+
     
+    ## Public functions
+
+
     @property
-    def total_tensor_memory_mib(self):
-        return self.total_tensor_memory / (1024 * 1024)
+    def total_memory(self) -> int:
+        return sum((mem.current for mem in self._memory.values()), 0)
+
+    @property
+    def total_memory_mib(self) -> float:
+        return self.total_memory / (1024 * 1024)
     
-    def _add_to_timeline(self):
-        self.memory_timeline.append(self.total_tensor_memory)
+    def get_device_memory(self, device: torch.device) -> int:
+        return self._memory[device].current
+    
+    def get_device_memory_mib(self, device: torch.device) -> int:
+        return self._memory[device].current / (1024 * 1024)
+    
 
-    def plot_values_over_time(self, dpi=300):
-        values = self.memory_timeline
-        """
-        Plots a list of float values over time using matplotlib.
+    ## Plotting
 
-        Parameters:
-            values (list of float): The values to plot.
-        """
-        if not values:
-            print("The list of values is empty.")
-            return
+    def save_memory_profile(self, save_path: str):
+        plt.figure()
+        for device, mem in self._memory.items():
+            label = str(device)
+            plt.plot(mem.timeline, label=label)
 
-        plt.figure(figsize=(10, 4))
-        plt.plot(range(len(values)), values, marker='o', linestyle='-')
-        plt.title("Values Over Time")
-        plt.xlabel("Time")
-        plt.ylabel("Value")
+        plt.xlabel("Operation Index")
+        plt.ylabel("Memory Usage (bytes)")
+        plt.title("Tensor Memory Usage Over Time")
+        plt.legend()
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig("file.png", dpi=dpi)
+        plt.savefig(save_path)
+        plt.close()
