@@ -1,0 +1,17 @@
+# vscode
+.vscode/
+
+# environment secrets
+.env
+
+# python
+*.pyc
+__pycache__
+*.egg-info
+
+# flask
+build/
+
+# research/ training folders
+research/
+wandb/
