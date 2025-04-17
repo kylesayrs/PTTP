@@ -1,6 +1,5 @@
 import torch
 from pttp import TensorProfiler, get_alloc_size, get_alloc_sizes
-import gc
 
 
 def test_constructor():

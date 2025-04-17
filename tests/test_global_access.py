@@ -7,4 +7,3 @@ def test_instance():
 def test_instance_context():
     with TensorProfiler() as prof:
         assert TensorProfiler.instance() is prof
-        breakpoint()

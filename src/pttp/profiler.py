@@ -19,21 +19,52 @@ __all__ = ["TensorProfiler"]
 aten = torch._ops.ops.aten
 
 
-@dataclass
 class MemoryProfile:
-    current: int = 0
-    timeline: List[int] = field(default_factory=list)
+    _timelines: Dict[torch.device, List[int]]
+
+    def __init__(self):
+        self._timelines: Dict[torch.device, List[int]] = defaultdict(list)
+
+    def add(self, device: torch.device, size: int):
+        if device not in self._timelines:
+            timeline = [0 for _ in range(max(len(self), 1))]
+            self._timelines[device] = timeline
+
+        for dev in self._timelines:
+            if dev == device:
+                diff = size
+            else:
+                diff = 0
+
+            self._timelines[dev].append(self._timelines[dev][-1] + diff)
+            
+    def subtract(self, device: torch.device, size: int):
+        self.add(device, -size)
+
+    @property
+    def timeline(self) -> Dict[torch.device, List[int]]:
+        return self._timelines
+    
+    @property
+    def current(self) -> Dict[torch.device, int]:
+        return {
+            device: self._timelines[device][-1]
+            for device in self._timelines
+        }
+
+    def __len__(self) -> int:
+        return max((len(timeline) for timeline in self._timelines.values()), default=0)
 
 
 class TensorProfiler(TorchDispatchMode, GlobalAccess):
-    _memory = Dict[torch.device, MemoryProfile]
+    _memory = MemoryProfile
     _tracked_tensors: Set[int]
     _events = List[Tuple[int, str]]
 
     def __init__(self):
-        self._memory: Dict[torch.device, MemoryProfile] = defaultdict(MemoryProfile)
+        self._memory: MemoryProfile = MemoryProfile()
         self._tracked: Set[int] = set()
-        _events: List[Tuple[int, str]] = list()
+        self._events: List[Tuple[int, str]] = list()
 
     def __torch_dispatch__(self, func, types, args, kwargs=None):
         ret = func(*args, **(kwargs or {}))
@@ -65,8 +96,7 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
             return
 
         # add tensor
-        self._memory[device].current += size
-        self._snapshot_timeline()
+        self._memory.add(device, size)
         self._tracked.add(_hash)
 
         # register hook to subtract memory
@@ -75,13 +105,8 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
 
     def _on_tensor_deallocated(self, hash: int, size: int, device: torch.device):
         # subtract tensor
-        self._memory[device].current -= size
-        self._snapshot_timeline()
+        self._memory.subtract(device, size)
         self._tracked.remove(hash)
-
-    def _snapshot_timeline(self):
-        for mem in self._memory.values():
-            mem.timeline.append(mem.current)
 
     
     ## Public functions
@@ -89,32 +114,34 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
 
     @property
     def total_memory(self) -> int:
-        return sum((mem.current for mem in self._memory.values()), 0)
+        return sum((mem for mem in self._memory.current.values()), 0)
 
     @property
     def total_memory_mib(self) -> float:
         return self.total_memory / (1024 * 1024)
     
     def get_device_memory(self, device: torch.device) -> int:
-        return self._memory[device].current
+        return self._memory.current[device]
     
     def get_device_memory_mib(self, device: torch.device) -> int:
-        return self._memory[device].current / (1024 * 1024)
+        return self._memory.current[device] / (1024 * 1024)
+    
+    @property
+    def memory_timeline(self):
+        return self._memory.timeline
     
 
     ## Plotting
 
     def mark_event(self, name: str):
-        self._snapshot_timeline()
-        timeline_lens = set(len(profile.timeline) for profile in self._memory.values())
-        assert len(timeline_lens) == 1
-        self._events.append(timeline_lens[0], name)
+        index = max(len(self._memory), 1)
+        self._events.append((index, name))
 
     def save_memory_profile(self, save_path: str):
         plt.figure()
 
-        for device, mem in self._memory.items():
-            plt.plot(mem.timeline, label=str(device))
+        for device, mem in self.memory_timeline.items():
+            plt.plot(mem, label=str(device))
 
         for index, name in self._events:
             plt.axvline(x=index, color="gray", linestyle="--", linewidth=1)
