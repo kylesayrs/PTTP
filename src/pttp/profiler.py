@@ -106,7 +106,7 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
 
     def mark_event(self, name: str):
         self._snapshot_timeline()
-        timeline_lens = set(len(timeline) for timeline in self._memory.values())
+        timeline_lens = set(len(profile.timeline) for profile in self._memory.values())
         assert len(timeline_lens) == 1
         self._events.append(timeline_lens[0], name)
 
