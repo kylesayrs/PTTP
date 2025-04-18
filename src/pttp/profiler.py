@@ -114,20 +114,20 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
         return ret
 
     def _track(self, storage: torch.UntypedStorage):
-        _hash = storage.data_ptr()
+        hash = storage.data_ptr()
         size = storage.nbytes()
         device = storage.device
 
         # skip if already tracked
-        if _hash in self._tracked:
+        if hash in self._tracked:
             return
 
         # track
         self._memory.add(device, size)
-        self._tracked.add(_hash)
+        self._tracked.add(hash)
 
         # register hook to subtract memory
-        finalizer = partial(self._untrack, _hash, size, device)
+        finalizer = partial(self._untrack, hash, size, device)
         weakref.finalize(storage, finalizer)
 
     def _untrack(self, hash: int, size: int, device: torch.device):
