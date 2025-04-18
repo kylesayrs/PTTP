@@ -131,10 +131,15 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
         weakref.finalize(storage, finalizer)
 
     def _untrack(self, hash: int, size: int, device: torch.device):
+        # skip if no longer tracking
+        if hash not in self._tracked:
+            return
+
         # untrack
         self._memory.subtract(device, size)
         self._tracked.remove(hash)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self._tracked = set()
         gc.collect()
         return super().__exit__(exc_type, exc_val, exc_tb)
