@@ -1,4 +1,3 @@
-from collections import defaultdict
 from typing import Dict, List
 
 import torch
@@ -10,7 +9,7 @@ class MemoryProfile:
     _timelines: Dict[torch.device, List[int]]
 
     def __init__(self):
-        self._timelines: Dict[torch.device, List[int]] = defaultdict(list)
+        self._timelines: Dict[torch.device, List[int]] = dict()
 
     def add(self, device: torch.device, size: int):
         if device not in self._timelines:
