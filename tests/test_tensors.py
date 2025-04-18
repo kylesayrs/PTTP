@@ -1,14 +1,10 @@
 import gc
-from typing import List
 
 import torch
 from helpers import requires_cuda
 
 from pttp import TensorProfiler
-
-
-def get_n_bytes(*tensors: List[torch.Tensor]):
-    return sum(tensor.nbytes for tensor in tensors)
+from helpers import get_n_bytes
 
 
 def test_constructor():
