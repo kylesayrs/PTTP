@@ -1,74 +1,109 @@
-from typing import List, Set, Dict, Tuple, Union
-
 import gc
 import weakref
 from functools import partial
-from collections import defaultdict
+from typing import Dict, List, Set, Tuple, Union
 
-import torch
-from torch.utils._python_dispatch import TorchDispatchMode
 import matplotlib.pyplot as plt
+import torch
 from matplotlib.ticker import MaxNLocator
+from torch.utils._python_dispatch import TorchDispatchMode
 
 from .global_access import GlobalAccess
+from .memory import MemoryProfile
 
 __all__ = ["TensorProfiler"]
 
 
-class MemoryProfile:
-    _timelines: Dict[torch.device, List[int]]
-
-    def __init__(self):
-        self._timelines: Dict[torch.device, List[int]] = defaultdict(list)
-
-    def add(self, device: torch.device, size: int):
-        if device not in self._timelines:
-            timeline = [0 for _ in range(max(len(self), 1))]
-            self._timelines[device] = timeline
-
-        for dev in self._timelines:
-            if dev == device:
-                diff = size
-            else:
-                diff = 0
-
-            self._timelines[dev].append(self._timelines[dev][-1] + diff)
-            
-    def subtract(self, device: torch.device, size: int):
-        self.add(device, -size)
-
-    @property
-    def current(self) -> Dict[torch.device, int]:
-        return {
-            device: self._timelines[device][-1]
-            for device in self._timelines
-        }
-    
-    @property
-    def peak(self) -> Dict[torch.device, int]:
-        return {
-            device: max(self._timelines[device])
-            for device in self._timelines
-        }
-
-    @property
-    def timeline(self) -> Dict[torch.device, List[int]]:
-        return self._timelines
-    
-
-    def __len__(self) -> int:
-        return max((len(timeline) for timeline in self._timelines.values()), default=0)
-
-
 class TensorProfiler(TorchDispatchMode, GlobalAccess):
-    _memory = MemoryProfile
     _tracked: Set[int]
-    _events = List[Tuple[int, str]]
+    _memory: MemoryProfile
+    _events: List[Tuple[int, str]]
 
     def __init__(self):
-        self._memory: MemoryProfile = MemoryProfile()
-        self._tracked: Set[int] = set()
-        self._events: List[Tuple[int, str]] = list()
+        self._tracked = set()
+        self._memory = MemoryProfile()
+        self._events = list()
+
+    # ::::::::::::::::::::::::::::::::::::::::::::::::
+    # 📤 Public API — user-facing methods
+    # ::::::::::::::::::::::::::::::::::::::::::::::::
+
+    @property
+    def memory(self) -> Dict[Union[torch.device, str], int]:
+        ret = self._memory.current.copy()
+        total = sum(ret.values(), start=0)
+        ret.update({"total": total})
+        return ret
+
+    @property
+    def memory_mib(self) -> Dict[Union[torch.device, str], float]:
+        return {device: value / (1024 * 1024) for device, value in self.memory.items()}
+
+    @property
+    def memory_peak(self) -> Dict[Union[torch.device, str], int]:
+        ret = self._memory.peak.copy()
+        all = max(ret.values(), default=0)
+        ret.update({"all": all})
+        return ret
+
+    @property
+    def memory_peak_mib(self) -> Dict[Union[torch.device, str], float]:
+        return {
+            device: value / (1024 * 1024) for device, value in self.memory_peak.items()
+        }
+
+    @property
+    def memory_timeline(self) -> Dict[torch.device, List[int]]:
+        return self._memory.timeline
+
+    @property
+    def memory_timeline_mib(self) -> Dict[torch.device, List[float]]:
+        return {
+            device: [value / (1024 * 1024) for value in timeline]
+            for device, timeline in self._memory.timeline
+        }
+
+    # ::::::::::::::::::::::::::::::::::::::::::::::::
+    # 📊 Plotting — visualization utilities
+    # ::::::::::::::::::::::::::::::::::::::::::::::::
+
+    def mark_event(self, name: str):
+        index = max(len(self._memory), 1) - 1
+        self._events.append((index, name))
+
+    def save_memory_timeline(self, save_path: str):
+        plt.figure()
+
+        for device, mem in self.memory_timeline.items():
+            plt.plot(mem, label=str(device))
+
+        for index, name in self._events:
+            plt.axvline(x=index, color="gray", linestyle="--", linewidth=1)
+            plt.text(
+                index,
+                plt.ylim()[1] * 0.95,
+                name,
+                rotation=90,
+                verticalalignment="top",
+                fontsize=8,
+            )
+
+        ax = plt.gca()
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+        plt.xlabel("Operation Index")
+        plt.ylabel("Memory Usage (bytes)")
+        plt.title("Tensor Memory Usage Over Time")
+        plt.legend()
+        plt.grid(True)
+        plt.ylim(bottom=0)
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close()
+
+    # ::::::::::::::::::::::::::::::::::::::::::::::::
+    # ⚙️ Tracking - Dispatch overload and finalizers
+    # ::::::::::::::::::::::::::::::::::::::::::::::::
 
     def __torch_dispatch__(self, func, types, args, kwargs=None):
         ret = func(*args, **(kwargs or {}))
@@ -99,80 +134,7 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
         # untrack
         self._memory.subtract(device, size)
         self._tracked.remove(hash)
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         gc.collect()
         return super().__exit__(exc_type, exc_val, exc_tb)
-
-    
-    ## Public functions
-
-
-    @property
-    def memory(self) -> Dict[Union[torch.device, str], int]:
-        ret = self._memory.current.copy()
-        total = sum(ret.values(), start=0)
-        ret.update({"total": total})
-        return ret
-
-    @property
-    def memory_mib(self) -> Dict[Union[torch.device, str], float]:
-        return {
-            device: value / (1024 * 1024)
-            for device, value in self.memory.items()
-        }
-    
-    @property
-    def memory_peak(self) -> Dict[Union[torch.device, str], int]:
-        ret = self._memory.peak.copy()
-        all = max(ret.values(), default=0)
-        ret.update({"all": all})
-        return ret
-    
-    @property
-    def memory_peak_mib(self) -> Dict[Union[torch.device, str], float]:
-        return {
-            device: value / (1024 * 1024)
-            for device, value in self.memory_peak.items()
-        }
-    
-    @property
-    def memory_timeline(self) -> Dict[torch.device, List[int]]:
-        return self._memory.timeline
-    
-    @property
-    def memory_timeline_mib(self) -> Dict[torch.device, List[float]]:
-        return {
-            device: [value / (1024 * 1024) for value in timeline]
-            for device, timeline in self._memory.timeline
-        }
-    
-
-    ## Plotting
-
-    def mark_event(self, name: str):
-        index = max(len(self._memory), 1) - 1
-        self._events.append((index, name))
-
-    def save_memory_profile(self, save_path: str):
-        plt.figure()
-
-        for device, mem in self.memory_timeline.items():
-            plt.plot(mem, label=str(device))
-
-        for index, name in self._events:
-            plt.axvline(x=index, color="gray", linestyle="--", linewidth=1)
-            plt.text(index, plt.ylim()[1] * 0.95, name, rotation=90, verticalalignment="top", fontsize=8)
-
-        ax = plt.gca()
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-        plt.xlabel("Operation Index")
-        plt.ylabel("Memory Usage (bytes)")
-        plt.title("Tensor Memory Usage Over Time")
-        plt.legend()
-        plt.grid(True)
-        plt.ylim(bottom=0)
-        plt.tight_layout()
-        plt.savefig(save_path)
-        plt.close()

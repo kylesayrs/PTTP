@@ -28,7 +28,7 @@ with TensorProfiler() as prof:
     del a, b; gc.collect()
     prof.mark_event("A and B collected")
 
-prof.save_memory_profile("memory.png")
+prof.save_memory_timeline("memory.png")
 remaining_memory = prof.memory  # 40 bytes
 ```
 

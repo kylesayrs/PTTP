@@ -1,7 +1,8 @@
 import torch
+from helpers import requires_cuda
 
 from pttp import TensorProfiler
-from helpers import requires_cuda
+
 
 @requires_cuda
 def test_timeline_with_events():
@@ -22,5 +23,5 @@ def test_timeline_with_events():
         assert prof._events == [
             (0, "Start event"),
             (1, "After cpu add"),
-            (2, "After cuda add")
+            (2, "After cuda add"),
         ]

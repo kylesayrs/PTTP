@@ -1,5 +1,4 @@
 import pytest
-
 import torch
 
 __all__ = ["requires_cuda"]

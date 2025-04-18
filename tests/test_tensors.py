@@ -1,9 +1,10 @@
+import gc
 from typing import List
 
-import gc
 import torch
-from pttp import TensorProfiler
 from helpers import requires_cuda
+
+from pttp import TensorProfiler
 
 
 def get_n_bytes(*tensors: List[torch.Tensor]):
@@ -16,14 +17,16 @@ def test_constructor():
 
     assert prof.memory["total"] == get_n_bytes(a)
 
+
 def test_constructor_functions():
     with TensorProfiler() as prof:
         a = torch.empty(16)
         b = torch.zeros(16)
         c = torch.ones(16)
-        d = torch.full((16, ), 0)
+        d = torch.full((16,), 0)
 
     assert prof.memory["total"] == get_n_bytes(a, b, c, d)
+
 
 def test_operations():
     with TensorProfiler() as prof:
@@ -31,6 +34,7 @@ def test_operations():
         b = a + a
 
     assert prof.memory["total"] == get_n_bytes(a, b)
+
 
 def test_views():
     with TensorProfiler() as prof:
@@ -41,11 +45,14 @@ def test_views():
         c = a[8:]
         d = a[4:12]
 
-        del a; gc.collect()
+        del a
+        gc.collect()
         assert prof.memory["total"] == a_storage_bytes
 
-        del b, c; gc.collect()
+        del b, c
+        gc.collect()
         assert prof.memory["total"] == a_storage_bytes
+
 
 @requires_cuda
 def test_device_movement():

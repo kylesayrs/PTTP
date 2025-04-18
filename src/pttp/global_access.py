@@ -1,9 +1,9 @@
-from abc import ABC, ABCMeta
-from typing import Type, TypeVar, List
-
 import weakref
+from abc import ABC, ABCMeta
+from typing import List, Type, TypeVar
 
 T = TypeVar("T", bound="GlobalAccess")
+
 
 class GlobalAccessMeta(ABCMeta):
     _instances: List[weakref.ReferenceType[T]]
@@ -14,6 +14,7 @@ class GlobalAccessMeta(ABCMeta):
 
     def _refresh_refs(cls):
         cls._instances = [ref for ref in cls._instances if ref() is not None]
+
 
 class GlobalAccess(ABC, metaclass=GlobalAccessMeta):
     def __new__(cls: Type[T], *args, **kwargs) -> T:
@@ -37,4 +38,3 @@ class GlobalAccess(ABC, metaclass=GlobalAccessMeta):
     def instances(cls: Type[T]) -> List[T]:
         cls._refresh_refs()
         return [ref() for ref in cls._instances]
-            
