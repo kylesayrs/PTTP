@@ -2,6 +2,7 @@ from typing import List
 
 import torch
 from pttp import TensorProfiler
+from helpers import requires_cuda
 
 
 def get_n_bytes(*tensors: List[torch.Tensor]):
@@ -39,3 +40,11 @@ def test_views():
         del a
 
     assert prof.total_memory == get_n_bytes(b, c)
+
+@requires_cuda
+def test_device_movement():
+    with TensorProfiler() as prof:
+        a = torch.empty(16)
+        b = a.to("cuda:0")
+
+    assert prof.total_memory == get_n_bytes(a, b)

@@ -1,8 +1,9 @@
 import torch
 
 from pttp import TensorProfiler
+from helpers import requires_cuda
 
-
+@requires_cuda
 def test_timeline_with_events():
     with TensorProfiler() as prof:
         prof.mark_event("Start event")
@@ -16,7 +17,7 @@ def test_timeline_with_events():
         assert prof.memory_timeline[torch.device("cpu")] == [0, 1, 1]
         assert prof.memory_timeline[torch.device("cuda:0")] == [0, 0, 2]
         assert prof._events == [
-            (1, "Start event"),
-            (2, "After cpu add"),
-            (3, "After cuda add")
+            (0, "Start event"),
+            (1, "After cpu add"),
+            (2, "After cuda add")
         ]
