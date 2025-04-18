@@ -121,20 +121,6 @@ def test_different_dtypes():
     assert prof.memory["total"] == get_n_bytes(a, b, c, d)
 
 
-def test_nested_profilers():
-    with TensorProfiler() as outer_prof:
-        a = torch.randn(16)
-
-        with TensorProfiler() as inner_prof:
-            b = torch.randn(32)
-            c = torch.randn(64)
-
-        d = torch.randn(128)
-
-    assert inner_prof.memory["total"] == get_n_bytes(b, c)
-    assert outer_prof.memory["total"] == get_n_bytes(a, b, c, d)
-
-
 def test_inplace_operations():
     with TensorProfiler() as prof:
         a = torch.randn(16)

@@ -10,7 +10,7 @@ class GlobalAccessMeta(ABCMeta):
 
     def __init__(cls, name, bases, namespace):
         super().__init__(name, bases, namespace)
-        cls._instances: List["GlobalAccess"] = list()
+        cls._instances = list()
 
     def _refresh_refs(cls):
         cls._instances = [ref for ref in cls._instances if ref() is not None]
