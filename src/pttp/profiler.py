@@ -1,4 +1,4 @@
-from typing import List, Set, Dict, Tuple
+from typing import List, Set, Dict, Tuple, Union
 
 import gc
 import weakref
@@ -38,15 +38,23 @@ class MemoryProfile:
         self.add(device, -size)
 
     @property
-    def timeline(self) -> Dict[torch.device, List[int]]:
-        return self._timelines
-    
-    @property
     def current(self) -> Dict[torch.device, int]:
         return {
             device: self._timelines[device][-1]
             for device in self._timelines
         }
+    
+    @property
+    def peak(self) -> Dict[torch.device, int]:
+        return {
+            device: max(self._timelines[device])
+            for device in self._timelines
+        }
+
+    @property
+    def timeline(self) -> Dict[torch.device, List[int]]:
+        return self._timelines
+    
 
     def __len__(self) -> int:
         return max((len(timeline) for timeline in self._timelines.values()), default=0)
@@ -101,22 +109,43 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
 
 
     @property
-    def total_memory(self) -> int:
-        return sum((mem for mem in self._memory.current.values()), 0)
+    def memory(self) -> Dict[Union[torch.device, str], int]:
+        ret = self._memory.current.copy()
+        total = sum(ret.values(), start=0)
+        ret.update({"total": total})
+        return ret
 
     @property
-    def total_memory_mib(self) -> float:
-        return self.total_memory / (1024 * 1024)
-    
-    def get_device_memory(self, device: torch.device) -> int:
-        return self._memory.current[device]
-    
-    def get_device_memory_mib(self, device: torch.device) -> int:
-        return self._memory.current[device] / (1024 * 1024)
+    def memory_mib(self) -> Dict[Union[torch.device, str], float]:
+        return {
+            device: value / (1024 * 1024)
+            for device, value in self.memory.items()
+        }
     
     @property
-    def memory_timeline(self):
+    def memory_peak(self) -> Dict[Union[torch.device, str], int]:
+        ret = self._memory.peak.copy()
+        all = max(ret.values(), default=0)
+        ret.update({"all": all})
+        return ret
+    
+    @property
+    def memory_peak_mib(self) -> Dict[Union[torch.device, str], float]:
+        return {
+            device: value / (1024 * 1024)
+            for device, value in self.memory_peak.items()
+        }
+    
+    @property
+    def memory_timeline(self) -> Dict[torch.device, List[int]]:
         return self._memory.timeline
+    
+    @property
+    def memory_timeline_mib(self) -> Dict[torch.device, List[float]]:
+        return {
+            device: [value / (1024 * 1024) for value in timeline]
+            for device, timeline in self._memory.timeline
+        }
     
 
     ## Plotting

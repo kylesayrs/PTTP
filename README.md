@@ -28,8 +28,8 @@ with TensorProfiler() as prof:
     del a, b; gc.collect()
     prof.mark_event("A and B collected")
 
-prof.save_memory_profile("asdf.png")
-remaining_memory = prof.total_memory  # 40 bytes
+prof.save_memory_profile("memory.png")
+remaining_memory = prof.memory  # 40 bytes
 ```
 
 <p align="center">
