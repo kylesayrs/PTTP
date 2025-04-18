@@ -1,10 +1,9 @@
 import gc
 
 import torch
-from helpers import requires_cuda
+from helpers import get_n_bytes, requires_cuda
 
 from pttp import TensorProfiler
-from helpers import get_n_bytes
 
 
 def test_constructor():

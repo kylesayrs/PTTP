@@ -1,3 +1,4 @@
 [flake8]
 per-file-ignores =
     tests/test_tensors.py: F841
+    tests/test_tracking.py: F841
