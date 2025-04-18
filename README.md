@@ -32,3 +32,4 @@ remaining_memory = prof.total_memory  # 40 bytes
 
 ## Limitations ##
 * Need to confirm support for gradients
+* Better options and graph visualization cleanup
