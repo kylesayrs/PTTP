@@ -5,6 +5,12 @@ PyTorch Tensor Profiler (PTTP) is a tool to profile memory allocated by pytorch 
 <img width="75%" src="assets/transformers_timeline.png" alt="Example Memory Timeline"/>
 </p>
 
+## Support ##
+* Tensor allocation and deallocation
+* Tensor dunder methods (+, -, *, /, ect.)
+* Tensor views which share the same storage
+* *As of now, there are no known methods of allocating tensor memory which is not captured by this profiler*
+
 ## Usage ##
 ```python
 import gc
@@ -33,3 +39,4 @@ remaining_memory = prof.total_memory  # 40 bytes
 ## Limitations ##
 * Need to confirm support for gradients
 * Better options and graph visualization cleanup
+* Better code documentation
