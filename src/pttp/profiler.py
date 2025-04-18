@@ -2,13 +2,13 @@ from typing import List, Set, Dict, Tuple
 
 import gc
 import weakref
-import warnings
 from functools import partial
 from collections import defaultdict
 
 import torch
 from torch.utils._python_dispatch import TorchDispatchMode
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 from .global_access import GlobalAccess
 
@@ -122,7 +122,7 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
     ## Plotting
 
     def mark_event(self, name: str):
-        index = max(len(self._memory), 1)
+        index = max(len(self._memory), 1) - 1
         self._events.append((index, name))
 
     def save_memory_profile(self, save_path: str):
@@ -135,11 +135,15 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
             plt.axvline(x=index, color="gray", linestyle="--", linewidth=1)
             plt.text(index, plt.ylim()[1] * 0.95, name, rotation=90, verticalalignment="top", fontsize=8)
 
+        ax = plt.gca()
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
         plt.xlabel("Operation Index")
         plt.ylabel("Memory Usage (bytes)")
         plt.title("Tensor Memory Usage Over Time")
         plt.legend()
         plt.grid(True)
+        plt.ylim(bottom=0)
         plt.tight_layout()
         plt.savefig(save_path)
         plt.close()
