@@ -5,18 +5,14 @@ import weakref
 import warnings
 from functools import partial
 from collections import defaultdict
-from dataclasses import dataclass, field
 
 import torch
 from torch.utils._python_dispatch import TorchDispatchMode
 import matplotlib.pyplot as plt
 
-from .helpers import get_alloc_size
 from .global_access import GlobalAccess
 
 __all__ = ["TensorProfiler"]
-
-aten = torch._ops.ops.aten
 
 
 class MemoryProfile:
@@ -58,7 +54,7 @@ class MemoryProfile:
 
 class TensorProfiler(TorchDispatchMode, GlobalAccess):
     _memory = MemoryProfile
-    _tracked_tensors: Set[int]
+    _tracked: Set[int]
     _events = List[Tuple[int, str]]
 
     def __init__(self):
@@ -69,44 +65,36 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
     def __torch_dispatch__(self, func, types, args, kwargs=None):
         ret = func(*args, **(kwargs or {}))
         if isinstance(ret, torch.Tensor):
-            tensor_hash = hash(ret)
-
-            # TODO: do not warn on these functions
-            # aten.set_.source_Storage
-            # aten.copy_.default
-            # aten.add_.Tensor
-            if tensor_hash in self._tracked:
-                warnings.warn(f"Attempted to track tensor twice from dispatch {func}")
-            
-            self.track_tensor(ret)
+            storage = ret.untyped_storage()
+            self._track(storage)
 
         return ret
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        gc.collect()
-        return super().__exit__(exc_type, exc_val, exc_tb)
 
-    def track_tensor(self, tensor: torch.Tensor) -> torch.Tensor:
-        _hash = hash(tensor)
-        size = get_alloc_size(tensor)
-        device = tensor.device
+    def _track(self, storage: torch.UntypedStorage):
+        _hash = storage.data_ptr()
+        size = storage.nbytes()
+        device = storage.device
 
         # skip if already tracked
         if _hash in self._tracked:
             return
 
-        # add tensor
+        # track
         self._memory.add(device, size)
         self._tracked.add(_hash)
 
         # register hook to subtract memory
-        finalizer = partial(self._on_tensor_deallocated, _hash, size, device)
-        weakref.finalize(tensor, finalizer)
+        finalizer = partial(self._untrack, _hash, size, device)
+        weakref.finalize(storage, finalizer)
 
-    def _on_tensor_deallocated(self, hash: int, size: int, device: torch.device):
-        # subtract tensor
+    def _untrack(self, hash: int, size: int, device: torch.device):
+        # untrack
         self._memory.subtract(device, size)
         self._tracked.remove(hash)
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        gc.collect()
+        return super().__exit__(exc_type, exc_val, exc_tb)
 
     
     ## Public functions
