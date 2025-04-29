@@ -1,5 +1,3 @@
-import gc
-
 import torch
 from helpers import get_n_bytes, requires_cuda
 
@@ -41,11 +39,9 @@ def test_views():
         d = a[4:12]
 
         del a
-        gc.collect()
         assert prof.memory["total"] == a_storage_bytes
 
         del b, c
-        gc.collect()
         assert prof.memory["total"] == a_storage_bytes
 
 

@@ -1,5 +1,3 @@
-import gc
-
 import pytest
 
 from pttp import TensorProfiler
@@ -39,5 +37,4 @@ def test_instances_collection():
     assert TensorProfiler.instances() == [instance]
 
     del instance
-    gc.collect()
     assert TensorProfiler.instances() == []

@@ -1,4 +1,3 @@
-import gc
 import weakref
 from functools import partial
 from typing import Dict, List, Set, Tuple, Union
@@ -126,9 +125,9 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
         self._memory.add(device, size)
         self._tracked.add(hash)
 
-        # register hook to subtract memory
+        # register finalizer to subtract memory
         finalizer = partial(self._untrack, hash, size, device)
-        weakref.finalize(storage, finalizer)
+        weakref.finalize(storage, finalizer)  # triggers regardless of gc
 
     def _untrack(self, hash: int, size: int, device: torch.device):
         # skip if no longer tracking
@@ -141,5 +140,4 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._tracked = set()
-        gc.collect()
         return super().__exit__(exc_type, exc_val, exc_tb)
