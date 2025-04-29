@@ -9,7 +9,7 @@
 * Tensor allocation and deallocation
 * Tensor dunder methods (+, -, *, /, ect.)
 * Tensor views which share the same storage
-* *As of now, there are no known methods of allocating tensor memory which is not captured by this profiler*
+* *As of now, there are no known methods of allocating tensor memory which is not captured by PTTP*
 
 ## Usage ##
 ```python
@@ -35,7 +35,3 @@ remaining_memory = prof.memory  # 40 bytes
 <p align="center">
 <img width="75%" src="assets/example_timeline.png" alt="Example Memory Timeline"/>
 </p>
-
-## TODO ##
-* Add tests for gradients
-* Better options for graph visualization
