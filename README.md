@@ -36,7 +36,6 @@ remaining_memory = prof.memory  # 40 bytes
 <img width="75%" src="assets/example_timeline.png" alt="Example Memory Timeline"/>
 </p>
 
-## Limitations ##
-* Need to confirm support for gradients
-* Better options and graph visualization cleanup
-* Better code documentation
+## TODO ##
+* Add tests for gradients
+* Better options for graph visualization
