@@ -160,7 +160,6 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
     ) -> bool:
         if self._catch_errors and exc_type is not None:
             tb.print_exception(exc_type, exc_value, traceback, file=sys.stderr)
-            exc_type, exc_value, traceback = None, None, None
 
         self._tracked = set()
-        return super().__exit__(exc_type, exc_value, traceback)
+        return super().__exit__(exc_type, exc_value, traceback) or self._catch_errors
