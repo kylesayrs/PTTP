@@ -1,6 +1,9 @@
+import sys
+import traceback as tb
 import weakref
 from functools import partial
-from typing import Dict, List, Set, Tuple, Union
+from types import TracebackType
+from typing import Dict, List, Optional, Set, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import torch
@@ -18,10 +21,11 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
     _memory: MemoryProfile
     _events: List[Tuple[int, str]]
 
-    def __init__(self):
+    def __init__(self, catch_errors: bool = True):
         self._tracked = set()
         self._memory = MemoryProfile()
         self._events = list()
+        self._catch_errors = catch_errors
 
     # ::::::::::::::::::::::::::::::::::::::::::::::::
     # 📤 Public API — user-facing methods
@@ -67,10 +71,20 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
     # ::::::::::::::::::::::::::::::::::::::::::::::::
 
     def mark_event(self, name: str):
+        """
+        Mark an event which will be drawn in any saved plots
+
+        :param name: event label
+        """
         index = max(len(self._memory), 1) - 1
         self._events.append((index, name))
 
     def save_memory_timeline(self, save_path: str):
+        """
+        Save a plot representing the captured memory profile
+
+        :param save_path: path to file with image-like extension (png, jpg, ect.)
+        """
         plt.figure()
 
         for device, mem in self.memory_timeline.items():
@@ -138,6 +152,15 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
         self._memory.subtract(device, size)
         self._tracked.remove(hash)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> bool:
+        if self._catch_errors and exc_type is not None:
+            tb.print_exception(exc_type, exc_value, traceback, file=sys.stderr)
+            exc_type, exc_value, traceback = None, None, None
+
         self._tracked = set()
-        return super().__exit__(exc_type, exc_val, exc_tb)
+        return super().__exit__(exc_type, exc_value, traceback)
