@@ -6,9 +6,10 @@
 </p>
 
 ## Support ##
-* Tensor allocation and deallocation
-* Tensor dunder methods (+, -, *, /, ect.)
-* Tensor views which share the same storage
+* Allocation and deallocation
+* Dunder methods (+, -, *, /, ect.)
+* Functions with nested outputs (chunk, topk, svd, where, ect.)
+* Views which share the same storage
 * *As of now, there are no known methods of allocating tensor memory which is not captured by PTTP*
 
 ## Usage ##
