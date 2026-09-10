@@ -1,6 +1,8 @@
 # PyTorch Tensor Profiler (PTTP) #
 **PyTorch Tensor Profiler (PTTP)** is a tool for accurately profiling the memory usage of PyTorch tensors. It measures the true memory footprint of tensors created by your program, without interference from higher-level abstractions like the Python garbage collector, PyTorch’s caching allocator, or the Linux virtual memory system.
 
+Unlike torch [memory_viz](https://pytorch.org/blog/understanding-gpu-memory-1/), this profiler is capable of tracking tensors on all devices (xpu, cpu, meta, etc) and marking milestone events in your program when they occur.
+
 <p align="center">
 <img width="75%" src="assets/transformers_timeline.png" alt="Example Memory Timeline"/>
 </p>
