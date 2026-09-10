@@ -1,9 +1,10 @@
 import torch
-from helpers import get_n_bytes, requires_cuda
+from helpers import device_parametrize, get_n_bytes, requires_cuda
 
 from pttp import TensorProfiler
 
 
+@device_parametrize
 def test_constructor():
     with TensorProfiler() as prof:
         a = torch.Tensor([0 for _ in range(16)])
@@ -11,6 +12,7 @@ def test_constructor():
     assert prof.memory["total"] == get_n_bytes(a)
 
 
+@device_parametrize
 def test_constructor_functions():
     with TensorProfiler() as prof:
         a = torch.empty(16)
@@ -21,6 +23,7 @@ def test_constructor_functions():
     assert prof.memory["total"] == get_n_bytes(a, b, c, d)
 
 
+@device_parametrize
 def test_operations():
     with TensorProfiler() as prof:
         a = torch.Tensor([1 for _ in range(16)])
@@ -29,6 +32,7 @@ def test_operations():
     assert prof.memory["total"] == get_n_bytes(a, b)
 
 
+@device_parametrize
 def test_views():
     with TensorProfiler() as prof:
         a = torch.empty(16)
@@ -62,7 +66,7 @@ def test_device_movement():
     assert prof.memory[meta_device] == get_n_bytes(c)
 
 
-@requires_cuda
+@device_parametrize
 def test_dtype_movement():
     with TensorProfiler() as prof:
         a = torch.empty(16, dtype=torch.float32)
@@ -72,6 +76,7 @@ def test_dtype_movement():
     assert prof.memory["total"] == get_n_bytes(a, b, c)
 
 
+@device_parametrize
 def test_complex_operations():
     with TensorProfiler() as prof:
         a = torch.randn(32)
@@ -83,6 +88,7 @@ def test_complex_operations():
     assert prof.memory["total"] == get_n_bytes(a, b, c, d, e)
 
 
+@device_parametrize
 def test_deletion_tracking():
     with TensorProfiler() as prof:
         a = torch.randn(64)
@@ -97,6 +103,7 @@ def test_deletion_tracking():
     assert prof.memory["total"] == get_n_bytes(d, e)
 
 
+@device_parametrize
 def test_view_operations():
     with TensorProfiler() as prof:
         a = torch.randn(4, 4)
@@ -107,6 +114,7 @@ def test_view_operations():
     assert prof.memory["total"] == get_n_bytes(a)
 
 
+@device_parametrize
 def test_different_dtypes():
     with TensorProfiler() as prof:
         a = torch.ones(16, dtype=torch.float32)
@@ -117,6 +125,7 @@ def test_different_dtypes():
     assert prof.memory["total"] == get_n_bytes(a, b, c, d)
 
 
+@device_parametrize
 def test_inplace_operations():
     with TensorProfiler() as prof:
         a = torch.randn(16)

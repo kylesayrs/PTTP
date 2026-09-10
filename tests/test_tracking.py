@@ -1,9 +1,10 @@
 import torch
-from helpers import get_n_bytes
+from helpers import device_parametrize, get_n_bytes
 
 from pttp import TensorProfiler
 
 
+@device_parametrize
 def test_use_after_exit():
     with TensorProfiler() as prof:
         a = torch.empty(16)
@@ -18,6 +19,7 @@ def test_use_after_exit():
     assert prof.memory["total"] == b_bytes
 
 
+@device_parametrize
 def test_nested_profilers():
     with TensorProfiler() as outer_prof:
         a = torch.randn(8)

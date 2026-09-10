@@ -20,12 +20,14 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
     _tracked: Set[int]
     _memory: MemoryProfile
     _events: List[Tuple[int, str]]
+    _exception: BaseException | None
 
-    def __init__(self, catch_errors: bool = True):
+    def __init__(self, catch_exception: bool = True):
         self._tracked = set()
         self._memory = MemoryProfile()
         self._events = list()
-        self._catch_errors = catch_errors
+        self._catch_exception = catch_exception
+        self._exception = None
 
     # ::::::::::::::::::::::::::::::::::::::::::::::::
     # 📤 Public API — user-facing methods
@@ -127,7 +129,7 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
         return ret
 
     def _track(self, storage: torch.UntypedStorage):
-        hash = storage.data_ptr()
+        hash = storage._cdata
         size = storage.nbytes()
         device = storage.device
 
@@ -158,8 +160,9 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> bool:
-        if self._catch_errors and exc_type is not None:
+        if self._catch_exception and exc_type is not None:
+            self._exception = exc_value
             tb.print_exception(exc_type, exc_value, traceback, file=sys.stderr)
 
         self._tracked = set()
-        return super().__exit__(exc_type, exc_value, traceback) or self._catch_errors
+        return super().__exit__(exc_type, exc_value, traceback) or self._catch_exception
