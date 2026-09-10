@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import torch
 from matplotlib.ticker import MaxNLocator
 from torch.utils._python_dispatch import TorchDispatchMode
+from torch.utils._pytree import tree_leaves
 
 from .global_access import GlobalAccess
 from .memory import MemoryProfile
@@ -122,9 +123,10 @@ class TensorProfiler(TorchDispatchMode, GlobalAccess):
 
     def __torch_dispatch__(self, func, types, args, kwargs=None):
         ret = func(*args, **(kwargs or {}))
-        if isinstance(ret, torch.Tensor):
-            storage = ret.untyped_storage()
-            self._track(storage)
+
+        for obj in tree_leaves(ret):
+            if isinstance(obj, torch.Tensor):
+                self._track(obj.untyped_storage())
 
         return ret
 
